@@ -36,28 +36,55 @@
 
 ## 4.2.X Iteration N: <Nombre de la Iteración>
 
-En esta sección se documenta la primera iteración del proceso **Attribute-Driven Design (ADD)** para la arquitectura de la aplicación ÑanGo.  
-El objetivo de esta iteración es capturar los *drivers* arquitectónicos clave y preparar el diseño inicial que guiará las siguientes fases.
-
 ### 4.2.X.1 Architectural Design Backlog N
 
-En este **backlog arquitectónico** se listan y priorizan los elementos que impulsan las decisiones de diseño en esta iteración:
+| ID | Tipo | Driver (Descripción) | Prioridad | Historias / TS relacionadas | Componentes afectados | Criterios de aceptación | Notas / Riesgos |
+|----|------|----------------------|-----------:|----------------------------|----------------------|-------------------------|-----------------|
+| ADB-01 | Funcional | **Registro y autenticación de usuarios**: flujo de registro con verificación por correo, login con JWT, recuperación y cambio de contraseña. | Alta | US01, TS01, US03, TS02, US02, US07 | Auth Service, User Service, Email Service, DB `usuario`, API Gateway, Security middleware | - POST /api/auth/register retorna 201 y crea usuario no verificado. - Se envía correo con token de verificación (link). - POST /api/auth/login devuelve access token (JWT) y refresh token. - Flujo de recuperación de contraseña envía link y permite cambiar contraseña. | Uso de hashing seguro (bcrypt/argon2). JWT short-lived + refresh tokens. Riesgo: envío de correo (proveedor). |
+| ADB-02 | Funcional | **Alta y verificación de conductores / carga de documentos** (DNI, carné universitario, licencia, datos de vehículo). | Alta | US17, US18, US08, TS05 | Driver Service, Identity Validation Service (externo), File Storage (S3), DB `conductor` | - Registro conductor persiste datos del vehículo. - Subida de documentos queda almacenada y se registra estado de verificación. - Integración con servicio externo devuelve `{valid:true/false}` y actualiza `verificado`. | Riesgo: latencia/errores del servicio externo; mitigar con reintentos y revisión manual. |
+| ADB-03 | Funcional | **Publicación de viajes por conductor** (ruta, horario, cupos, costo). | Alta | US19, TS03 | Trip Service, Search/Query API, DB `viaje` | - POST /api/trips crea viaje con estado `publicado`. - Viaje aparece en consultas y filtros (origen, destino, fecha). | Indexar campos de búsqueda en DB. Validar integridad de datos. |
+| ADB-04 | Funcional | **Solicitud para unirse a un viaje y control de concurrencia** (evitar duplicados y sobreventa de asientos). | Alta | US10, TS04, US09 | Trip Service, Request Service, DB `solicitud_viaje`, Notification Service | - POST /api/trips/{id}/join retorna 200 si se crea solicitud. - Si ya solicitó: 409. - Si cupos completos: respuesta y no crear solicitud. - Consistencia ACID en decremento/lock de asientos. | Implementar transacciones/optimistic locking para evitar sobreventa. |
+| ADB-05 | Funcional | **Gestión de solicitudes por conductor (aceptar/rechazar)** y notificación al pasajero. | Alta | US20, US11 | Trip Service, Request Service, Notification Service, DB `solicitud_viaje` | - Cambio de estado `aceptada`/`rechazada` persiste. - Notificación enviada en tiempo real y por fallback (email). | Validar roles y autorización (solo conductor propietario puede aceptar). |
+| ADB-06 | Funcional / NFR | **Notificaciones en tiempo real** (aceptación/rechazo, alerts de demanda). Base para eventos. | Alta | US11, US24 | Notification Service (pub/sub), WebSocket Gateway, Message Broker (e.g., RabbitMQ/Redis), DB `notificacion` | - Evento de cambio relevante publica mensaje en broker. - Usuarios suscritos reciben evento vía WebSocket en < 2s. - Fallback: notificación persistida y envío por correo/SMS si necesario. | Pendiente seleccionar tecnología de mensajería (RabbitMQ vs Redis vs Kafka). |
+| ADB-07 | Funcional | **Chat por viaje** (habilitado tras aceptación) y almacenamiento de mensajes. | Media/Alta | US06, US13, US22 | Chat Service (WebSockets), DB `chat` y `mensaje` (o store rápido), Gateway | - Solo usuarios aceptados/publicados pueden escribir en chat del viaje. - Mensajes llegan en tiempo real y se persisten. | Evaluar uso de DB relacional (mensajes persistentes) + cache para últimos N mensajes. Riesgo: alta I/O si mensajes masivos. |
+| ADB-08 | Funcional | **Calificación post-viaje y reputación** (guardar puntuaciones y comentarios, cálculo promedio). | Media | US12, US21 | Rating Service, DB `calificacion`, User Profile | - Registro de calificación asociado a viaje. - Cálculo o agregación de promedio visible en perfil de conductor. | Decidir recalculo en write o batch. |
+| ADB-09 | Funcional | **Historial de viajes y finanzas** (historial pasajero y ganancias conductor). | Media | US15, US23, historial_pago | History Service, Payments DB (`historial_pago`), UI | - Consultas por usuario devuelven historial con filtros por fecha y tipo. - Ganancias por conductor agregadas correctamente. | Si se integra pasarela de pagos, considerar conciliación. |
+| ADB-10 | Funcional | **Reporte de incidentes** (registro y triaje). | Media | US25 | Reports Service, DB `reporte_incidente`, Admin Dashboard | - Reporte creado con motivo y descripción. - Administrador puede acceder al registro. | Privacidad y almacenamiento seguro de datos sensibles. |
+| ADB-11 | Calidad (Seguridad) | **Seguridad global**: TLS en transporte, hashing de contraseñas, RBAC, validaciones de entrada, rate limiting, protección contra CSRF/OWASP. | Alta | — | Todos los servicios (Auth Service crítico), API Gateway, DB | - Todas las APIs detrás de TLS. - No existen contraseñas en texto plano. - Accesos a endpoints críticos requieren token válido y rol. - Rate limits aplicados. | Medir: 0 vulnerabilidades críticas en escaneo SAST básico. |
+| ADB-12 | Calidad (Rendimiento / Escalabilidad) | **Respuesta y escalado**: tiempos objetivos y capacidad de escalar horizontalmente. | Alta | — | API Gateway, Caching (Redis), DB, Load Balancer | - GETs simples < 200 ms en condiciones normales. - Arquitectura soporta escalamiento horizontal (stateless services). - Cache para consultas frecuentes (búsqueda de viajes). | Meta de arranque: soportar 1k usuarios concurrentes; escalar a 10k con autoscaling. |
+| ADB-13 | Calidad (Disponibilidad) | **Alta disponibilidad y tolerancia a fallos**: salud, retries, circuit breaker. | Media | — | Orquestador (Docker/K8s), Load Balancer, Monitoring/Logging | - Health checks configurados. - Retries con backoff y circuit breakers frente a servicios externos. - Monitoreo y alertas. | SLA objetivo 99.9% (a definir). |
+| ADB-14 | Calidad (Mantenibilidad / Testability) | **Arquitectura modular y testable**: repositorios, DTOs, interfaces, BDD tests (.feature), CI/CD. | Alta | — | All services, Repositorios, CI pipeline | - Repositorios abstraen acceso a BD. - Tests unitarios y .feature de BDD cubren flujos críticos. - Pipeline CI ejecuta pruebas y despliega a staging automáticamente. | Uso de GitHub + GitFlow + Conventional Commits (convención). |
+| ADB-15 | Restricción (Persistence) | **Base de datos relacional obligatoria**: PostgreSQL como DB primaria. Esquema relacional documentado (DBML). | Alta | DB Diagram | PostgreSQL, Migrations (Flyway/TypeORM), Backups | - Esquema implementado por migrations. - Backups diarios automáticos. | Evaluar uso complementario de NoSQL/Redis para chat/caching. |
+| ADB-16 | Restricción (Despliegue) | **Contenerización y Cloud**: empaquetar servicios en Docker; despliegue en AWS (ECS/EKS) o equivalente. | Alta | — | Docker, Orquestador (ECS/EKS), CI/CD | - Imagenes Docker construidas y almacenadas en registry. - Despliegue a entorno staging reproducible. | Definir infra-as-code (Terraform/CloudFormation). |
+| ADB-17 | Restricción (Servicios externos) | **Integraciones externas**: proveedor de correo/SMS, API de validación de identidad, pasarela de pago (TBD). | Alta | TS05, historial_pago | Email/SMS Provider, Identity API, Payment Gateway | - Integración con proveedor de correo con fallback. - Tratamiento de errores y límites de cuota. | Riesgo: dependencia de SLA de terceros; plan de degradado. |
+| ADB-18 | Riesgo / Decisión pendiente | **Selección de mensajería y realtime stack**: RabbitMQ vs Redis Streams vs Kafka; WebSocket vs SSE. | Alta | US11, US06 | Message Broker, WebSocket Server (Socket.IO), Notification Service | - Decidir tecnología en esta iteración antes de codificar notificaciones. | Recomendación: RabbitMQ (mensajería simple, confirmaciones) + WebSocket (Socket.IO) para prototipo; evaluar Kafka si la escala lo justifica. |
 
-- **Requisitos funcionales principales**  
-  - Ejemplo: Permitir registro y autenticación de usuarios mediante OAuth 2.0.  
-  - Ejemplo: Gestionar viajes en tiempo real con actualización de estado.
+---
 
-- **Atributos de calidad**  
-  - Rendimiento: respuesta < 200 ms en operaciones críticas.  
-  - Escalabilidad: soportar picos de 10 000 usuarios concurrentes.  
-  - Seguridad: cifrado de datos en tránsito y en reposo.
+#### Prioridad inicial (orden sugerido para la Iteración 1)
+1. ADB-01 Registro y autenticación (Auth skeleton) — **Alta prioridad**  
+2. ADB-03 Publicación de viajes (Trip skeleton) — **Alta**  
+3. ADB-04 Solicitud para unirse a un viaje (Request skeleton + concurrencia) — **Alta**  
+4. ADB-02 Onboarding y verificación de conductores (básico) — **Alta**  
+5. ADB-15 Persistencia relacional (migrations, esquema inicial PostgreSQL) — **Alta**  
+6. ADB-06 Fundamentos de notificaciones en tiempo real (decisión de mensajería) — **Alta**  
+7. ADB-14 CI/CD, pruebas BDD mínimas y convenciones de código — **Alta**
 
-- **Restricciones técnicas**  
-  - Base de datos relacional PostgreSQL.  
-  - Backend en Node.js con framework Express.  
-  - Despliegue en contenedores Docker sobre AWS.
+**Razonamiento:** esta priorización entrega el flujo mínimo viable: crear cuentas, publicar viajes, permitir solicitudes y administrar asientos, con la base de datos y seguridad necesarias. Paralelamente se define la infraestructura (migrations, CI/CD) y las decisiones que afectan diseño global (mensajería/realtime).
 
-- **Decisiones pendientes / riesgos**  
-  - Definir patrón de comunicación entre microservicios (REST vs gRPC).  
-  - Seleccionar servicio de mensajería para notificaciones en tiempo real.
+---
 
+#### Formato de trabajo sugerido en esta iteración
+- Descomponer cada ADB en tasks técnicos (DB migrations, endpoints, pruebas BDD, integración con broker).  
+- Estimar tasks y llevarlos al Sprint/Kanban (To-Do / In-Progress / To-Review / Done).  
+- Para cada task definir **Definition of Done**: código + tests unitarios + integración + PR + revisión de seguridad básica.  
+- Registrar decisiones arquitectónicas relevantes (fecha, decisión, alternativas consideradas, responsable).
+
+---
+
+#### Riesgos transversales y mitigaciones rápidas
+- **Dependencia de servicios externos (identity, email, pago):** mitigar con caché, retries y proceso manual para casos fallidos.  
+- **Problemas de concurrencia en reservas de asientos:** usar transacciones o bloqueo optimista y pruebas de carga.  
+- **Escalado no planificado del chat/notificaciones:** diseñar para separar persistencia de mensajes del canal realtime (cache + persistencia diferida).
+
+---
