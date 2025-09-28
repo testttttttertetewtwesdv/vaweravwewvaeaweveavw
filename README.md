@@ -61,5 +61,3 @@ En este **backlog arquitectónico** se listan y priorizan los elementos que impu
   - Definir patrón de comunicación entre microservicios (REST vs gRPC).  
   - Seleccionar servicio de mensajería para notificaciones en tiempo real.
 
-> **Nota:** Esta subsección captura únicamente el **Architectural Design Backlog** de la Iteración N.  
-> Los pasos siguientes (4.2.X.2 a 4.2.X.7) se desarrollarán en las fases posteriores del informe.
