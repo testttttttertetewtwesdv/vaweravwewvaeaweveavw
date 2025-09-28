@@ -1,0 +1,65 @@
+# Design Patterns
+
+## Patrones seleccionados
+
+### 1. Singleton (Creacional)
+- **Problema:** Se requiere una sola instancia para manejar la configuración y la conexión a la base de datos.
+- **Aplicación:** Clase `DatabaseConnection` asegurará una única conexión compartida por todos los módulos.
+- **Beneficios:** Evita múltiples conexiones, centraliza la configuración.
+
+### 2. Repository (Estructural)
+- **Problema:** Separar la lógica de negocio de la persistencia de datos.
+- **Aplicación:** Repositorios `UsuarioRepository`, `ViajeRepository`, etc., que encapsulan consultas y operaciones de la base de datos.
+- **Beneficios:** Facilita pruebas unitarias, cambio de motor de BD sin alterar la lógica de dominio.
+
+### 3. Observer / Publisher–Subscriber (Comportamiento)
+- **Problema:** Enviar notificaciones en tiempo real cuando se actualiza un viaje o se acepta una solicitud.
+- **Aplicación:** El módulo de notificaciones se suscribe a eventos del módulo de viajes y emite mensajes a los usuarios.
+- **Beneficios:** Desacopla el emisor de los receptores, facilita añadir nuevos canales de notificación.
+
+### 4. Strategy (Comportamiento)
+- **Problema:** Permitir distintos cálculos de tarifas o métodos de pago.
+- **Aplicación:** Una interfaz `PaymentStrategy` con implementaciones para tarjeta, efectivo, billetera digital.
+- **Beneficios:** Permite añadir nuevos métodos sin cambiar la lógica central.
+
+### 5. Factory Method (Creacional)
+- **Problema:** Crear objetos de notificación (Push, Email, SMS) sin acoplar el código a clases concretas.
+- **Aplicación:** `NotificationFactory` devolverá el tipo de notificación adecuado según configuración.
+- **Beneficios:** Centraliza la creación y facilita la extensión.
+
+
+
+![Descripción de la imagen](/assets/diagramasrelacionaldebasesdedatos.png)
+
+
+
+
+## 4.2.X Iteration N: <Nombre de la Iteración>
+
+En esta sección se documenta la primera iteración del proceso **Attribute-Driven Design (ADD)** para la arquitectura de la aplicación ÑanGo.  
+El objetivo de esta iteración es capturar los *drivers* arquitectónicos clave y preparar el diseño inicial que guiará las siguientes fases.
+
+### 4.2.X.1 Architectural Design Backlog N
+
+En este **backlog arquitectónico** se listan y priorizan los elementos que impulsan las decisiones de diseño en esta iteración:
+
+- **Requisitos funcionales principales**  
+  - Ejemplo: Permitir registro y autenticación de usuarios mediante OAuth 2.0.  
+  - Ejemplo: Gestionar viajes en tiempo real con actualización de estado.
+
+- **Atributos de calidad**  
+  - Rendimiento: respuesta < 200 ms en operaciones críticas.  
+  - Escalabilidad: soportar picos de 10 000 usuarios concurrentes.  
+  - Seguridad: cifrado de datos en tránsito y en reposo.
+
+- **Restricciones técnicas**  
+  - Base de datos relacional PostgreSQL.  
+  - Backend en Node.js con framework Express.  
+  - Despliegue en contenedores Docker sobre AWS.
+
+- **Decisiones pendientes / riesgos**  
+  - Definir patrón de comunicación entre microservicios (REST vs gRPC).  
+  - Seleccionar servicio de mensajería para notificaciones en tiempo real.
+
+> **Nota:** Esta subsección captura únicamente el **Architectural Design Backlog** de la Iteración N.  
+> Los pasos siguientes (4.2.X.2 a 4.2.X.7) se desarrollarán en las fases posteriores del informe.
