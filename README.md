@@ -29,7 +29,7 @@
 
 
 
-![Descripción de la imagen](/assets/diagramasrelacionaldebasesdedatos.png)
+![Descripción de la imagen](/img/diagramasrelacionaldebasesdedatos.png)
 
 
 
