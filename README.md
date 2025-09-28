@@ -33,9 +33,6 @@
 
 
 
-
-## 4.2.X Iteration N: <Nombre de la Iteración>
-
 ### 4.2.X.1 Architectural Design Backlog N
 
 | ID | Tipo | Driver (Descripción) | Prioridad | Historias / TS relacionadas | Componentes afectados | Criterios de aceptación | Notas / Riesgos |
